@@ -6,7 +6,7 @@ extern crate rand;
 
 const BOARD_SIZE: usize = 10;
 const UNKNOWN_POINT: &str = "  .  ";
-const SUNK_POINT: &str = "  ✔  ";
+const SUNK_POINT: &str = "  X  ";
 const MISSED_POINT: &str = "  x  ";
 const WATER_POINT: &str = "  ~  ";
 
@@ -24,7 +24,7 @@ impl AttackResult {
     hit, missed, or sunk. */
     fn to_string(&self) -> String {
         match self {
-            AttackResult::Miss => String::from("  ⚬  "),
+            AttackResult::Miss => String::from("  o  "),
             AttackResult::Hit => String::from("  X  "),
             AttackResult::Sunk => String::from(SUNK_POINT),
         }
