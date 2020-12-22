@@ -10,18 +10,22 @@ const SUNK_POINT: &str = "  X  ";
 const MISSED_POINT: &str = "  x  ";
 const WATER_POINT: &str = "  ~  ";
 
-/* Used to for AI to keep track of results
-and displaying correct character for each OceanPoint.*/
+/*
+    AttackResult prints meaningful a display to the terminal.
+    Helps the player remember whether or not each point was
+    hit, missed, or sunk. 
+    
+    AttackResult is also used for AI to keep track of results
+    and display the correct character for each OceanPoint.
+*/
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum AttackResult {
     Miss,
     Hit,
     Sunk,
 }
+
 impl AttackResult {
-    /* Used to print meaningful display to the terminal.
-    Helps the player remember whether or not each point was
-    hit, missed, or sunk. */
     fn to_string(&self) -> String {
         match self {
             AttackResult::Miss => String::from("  o  "),
@@ -30,8 +34,11 @@ impl AttackResult {
         }
     }
 }
-/* Used for UI to display different symbols on player side,
-or to determine if an attack was a hit on either side fo the board.
+
+/* 
+    ShipType is Used to create the UI to implement the printing of a 
+    ship location, determine its size and character (each ship has a
+    different character).
 */
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum ShipType {
@@ -43,8 +50,11 @@ enum ShipType {
     NoShip,
     Unknown,
 }
+
 impl ShipType {
-    /* Prints meaningful characters on locations of the player's ships.  */
+    /* 
+        Prints meaningful characters on locations of the player's ships.  
+    */
     pub fn to_string(&self) -> String {
         match self {
             ShipType::Destroyer => String::from("  D  "),
@@ -56,6 +66,11 @@ impl ShipType {
             ShipType::Unknown => String::from(" ? "),
         }
     }
+    
+     /* 
+         Correlates to the size of the vector of ocean points
+         needed to place each stip. 
+     */
     fn get_ship_size(&self) -> usize {
         match self {
             ShipType::Destroyer => 2,
@@ -67,6 +82,10 @@ impl ShipType {
             ShipType::Unknown => 0,
         }
     }
+    
+    /*
+        Get the name of each ship
+    */
     fn get_name(&self) -> String {
         match self {
             ShipType::Destroyer => String::from("Destroyer"),
@@ -79,7 +98,16 @@ impl ShipType {
         }
     }
 }
-/* AI has its own board to keep track of previous attacks and results */
+
+/*
+    AI gives the player an opponent to play against.
+    AI has a special board to represent "artificial memory". 
+    It keep track of previous attacks and results.
+    AI also has a stack of (x, y) tuples. When the AI 
+    successfully hits one of the player's ships, it pushes all
+    (x, y) tuples of any surrounding points to the stack, and
+    draws new guesses from there.
+*/
 struct AI {
     board: [[Guess; BOARD_SIZE]; BOARD_SIZE],
     stack: Vec<(usize, usize)>,
@@ -103,10 +131,11 @@ impl AI {
         }
     }
 
-    /* Called when AI attacks player's ocean.
-    If there are no adjacent points to a previous successful hit left to attack,
-    a choose a random point that has not been attempted yet, and attack that point.
-    Record the results on the AI board.
+    /* 
+        Called when AI attacks player's ocean.
+        If there are no adjacent points to a previous successful hit left to attack,
+        the AI chooses a random point that has not been attempted yet, and attack 
+        that point. Record the results on the AI board.
      */
     fn attack(&mut self, player_board: &mut Ocean) {
         let mut attack_point = (BOARD_SIZE + 1, BOARD_SIZE + 1);
@@ -122,6 +151,8 @@ impl AI {
                 }
             };
         }
+        
+        
         match player_board.attack(attack_point) {
             true => {
                 println!(
@@ -140,17 +171,26 @@ impl AI {
             }
         }
     }
+    
+    // Check whether a player has a ship at a particular location.
     fn has_ship_at(&self, point: (usize, usize)) -> bool {
         self.board[point.0][point.1].ship_type.is_some()
     }
+    
+    // Is there a ship here? if so, what type?
     fn get_ship_type(&self, point: (usize, usize)) -> Option<ShipType> {
         self.board[point.0][point.1].ship_type
     }
+    
+    // Place a ship on the board at the beginning of the game.
     fn set_ship_type(&mut self, point: (usize, usize), ship_type: ShipType) {
         self.board[point.0][point.1].ship_type = Some(ship_type);
     }
-    /* Called when AI has struck a player ship. Push all surrounding points to
-    a the stack of future high-priority strikes. */
+    
+    /* 
+        Called when AI has struck a player ship. Push all surrounding points to
+        a the stack of future high-priority strikes (AI guesses).
+    */
     fn push_surrounding_points(&mut self, point: (usize, usize)) {
         let mut other_points = [
             (point.0 + 1, point.1),
@@ -158,6 +198,7 @@ impl AI {
             (point.0, point.1 - 1),
             (point.0, point.1 + 1),
         ];
+        
         for i in 0..other_points.len() {
             match is_in_bounds(other_points[i])
                 && !self.has_ship_at((other_points[i].0, other_points[i].1))
@@ -169,14 +210,18 @@ impl AI {
         }
     }
 }
-/*2d array of OceanPoint structs, vector of ships, and identifier
-for whether or not this side of the ocean belongs to the player. */
+
+/*
+    Ocean is a 2d array of OceanPoints. It has a vector of Ships located on it, 
+    and a boolean for whether or not this side of the ocean belongs to the player.
+*/
 #[derive(Debug)]
 struct Ocean {
     ocean: Vec<Vec<OceanPoint>>,
     fleet: Vec<Ship>,
     is_player: bool,
 }
+
 impl Ocean {
     fn new(is_player: bool) -> Self {
         Self {
@@ -187,9 +232,13 @@ impl Ocean {
             is_player,
         }
     }
-    /* Used when player attacks AI. Checks for a successful hit and
-    reveals that point on AI side upon success.
-    Prints a message about the result.*/
+    
+    /*
+        Used when player attacks AI.
+        This method first checks for a successful hit and
+        reveals that point on AI side upon success, then
+        prints a message about the result.
+    */
     fn attack(&mut self, (x, y): (usize, usize)) -> bool {
         match self.ocean[x][y].ship_type {
             Some(ship_type) => {
@@ -205,8 +254,12 @@ impl Ocean {
             }
         }
     }
-    /* Find the ship that was hit, and see if all of the OceanPoint in
-    that ship's location have been hit. */
+    
+    /* 
+        To check if a ship is sunk, find the ship that was hit,
+        and see if all of the OceanPoints in that ship's location have been hit.
+        Retrun true if so.
+    */
     fn check_for_sunk(&mut self, tuple: (usize, usize)) -> bool {
         for ship in &mut self.fleet {
             if ship.location.contains(&tuple) {
@@ -215,6 +268,7 @@ impl Ocean {
         }
         false
     }
+    
     /* Re-displays AI and Player maps to the terminal. */
     pub fn show(&mut self) {
         let spaces = "   ";
@@ -256,7 +310,8 @@ impl Ocean {
         }
         println!("{}\n\n", horizontal_separator);
     }
-    /* Randomly places ships for both fleets in the ocean. */
+    
+    /* Randomly places ships for both fleets in their respective Ocean. */
     fn generate_fleet(&mut self) {
         let ships: [ShipType; 5] = [
             ShipType::Destroyer,
@@ -318,8 +373,12 @@ impl Ocean {
         }
     }
 }
-/* Struct that holds info on what type of ship is located at a particular (x,y)
-coordinate (if any), and an attack result (if it has been attacked) */
+
+/* 
+    OceanPoint is a struct that holds info on what type of ship is located 
+    at a particular (x,y) coordinate (if any), and an attack result 
+    (if it has been attacked).
+*/
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 struct OceanPoint {
     ship_type: Option<ShipType>, // represents a ship ID
@@ -332,26 +391,32 @@ impl OceanPoint {
             attack_result: None,
         }
     }
+    
     /* This changes to Some(ShipType) if a ship has been placed at that location */
     pub fn set_ship_type(&mut self, ship_type: ShipType) {
         self.ship_type = Some(ship_type);
     }
+    
     /* Used to see if a ship exists at the this OceanPoint */
     pub fn get_ship_type(&self) -> Option<ShipType> {
         self.ship_type
     }
+    
     /* When this point is attacked, its "attack_result" is updated Hit or Miss,
     depending on whether or not there is a ship here */
     pub fn set_attack_result(&mut self, attack_result: AttackResult) {
         self.attack_result = Some(attack_result);
     }
+    
     /* Used to find out if this point has been attacked yet. */
     pub fn get_attack_result(&self) -> Option<AttackResult> {
         self.attack_result
     }
 }
-/* Struct used by the AI to represent an 'OceanPoint' on the player's board,
-and information about an attack on that point, if any.
+/* 
+    Struct used by the AI to represent an 'OceanPoint' on the player's board
+    (just like the player, it cannot "see" anything that has not been hit),
+    and information about an attack on that point, if any.
  */
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 struct Guess {
@@ -360,6 +425,7 @@ struct Guess {
     ship_type: Option<ShipType>,
     adjacent_points: [Option<bool>; 4],
 }
+
 impl Guess {
     pub fn new() -> Self {
         Self {
@@ -370,8 +436,11 @@ impl Guess {
         }
     }
 }
-/* Represents a ship in the fleet. Holds information about its location as
-a vector of (x,y) coordinates. */
+
+/* 
+    Represents a ship in the fleet. Holds information about its location as
+    a vector of (x,y) coordinates. 
+*/
 #[derive(Debug)]
 struct Ship {
     location: Vec<(usize, usize)>,
@@ -388,8 +457,11 @@ impl Ship {
             display_string: print_string,
         }
     }
-    /* Called by player and AI boards. Returns true if
-    OceanPoints in ship's location has an 'AttackResult'.*/
+    
+    /* 
+        Called by player and AI boards. Returns true if
+        OceanPoints in ship's location has an 'AttackResult'.
+    */
     fn is_sunk(&mut self, ocean: &Vec<Vec<OceanPoint>>) -> bool {
         for point in &self.location {
             match ocean[point.0][point.1].get_attack_result() {
@@ -400,10 +472,12 @@ impl Ship {
         true
     }
 }
+
 /* Used to make sure any randomly-generated points are within the bounds of the board. */
 pub fn is_in_bounds(point: (usize, usize)) -> bool {
     point.0 < BOARD_SIZE && point.0 >= 0 && point.1 < BOARD_SIZE && point.1 >= 0
 }
+
 /* Used to generate a random (x,y) coordinate */
 pub fn rand_point() -> (usize, usize) {
     let mut rng = rand::thread_rng();
@@ -412,21 +486,38 @@ pub fn rand_point() -> (usize, usize) {
         rng.gen_range(0, BOARD_SIZE) as usize,
     )
 }
+
 fn main() {
+    /*
+        Make a hashmap of numbers and letters for the board 
+    */
     let alphas: HashMap<String, usize> = (b'A'..=b'J')
         .enumerate()
         .map(|(i, c)| ((c as char).to_string(), i + 1))
         .collect();
     println!("{:?}", alphas);
+    
+    /* 
+        Make the player and AI boards, as well as a "AI memory" 
+        board to "remember" where it has attacked. 
+    */
     let mut player_board = Ocean::new(true);
     let mut ai_board = Ocean::new(false);
     let mut ai = AI::new();
+    
+    /*
+        Generate fleets for both boards, and show them to the console.
+    */
     player_board.generate_fleet();
     ai_board.generate_fleet();
     ai_board.show();
     player_board.show();
+    
+    /*
+        Count how many rounds it takes to win/lose.
+        This loop breaks when the game ends.
+    */
     let mut round_count = 1;
-
     loop {
         let mut guess = String::new();
         println!(
@@ -438,7 +529,7 @@ fn main() {
             .read_line(&mut guess)
             .expect("Failed to read line");
 
-        let mut substr_iter = guess.split_whitespace(); //.split_whitespace();
+        let mut substr_iter = guess.split_whitespace();
         let mut next_num = || -> usize {
             substr_iter
                 .next()
